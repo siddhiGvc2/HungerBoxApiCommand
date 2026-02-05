@@ -86,13 +86,14 @@ app.get(
   apiKeyAuth,
   (req, res) => {
      const { txnId } = req.params;
+      const lastHeartBeatTime= deviceStatus[txnId];
       if (!lastHeartBeatTime) {
       return res.json({
         txn_id: txnId,
         status: "NOT_FOUND"
       });
     }
-    const lastHeartBeatTime= deviceStatus[txnId];
+   
     if(lastHeartBeatTime < new Date(Date.now() - 5 * 60 * 1000).toISOString()){
       return res.json({
         txn_id: txnId,
