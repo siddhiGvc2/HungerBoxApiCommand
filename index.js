@@ -22,42 +22,78 @@ function apiKeyAuth(req, res, next) {
   next();
 }
 
-// ---- CREATE ORDER ----
 app.post(
   "/api/v1/machines/:machineId/orders",
   apiKeyAuth,
-  (req, res) => {
+  async (req, res) => {
     const { machineId } = req.params;
     const { txn_id, amount, items } = req.body;
+    const webhookUrl = req.header("Webhook-Url"); // optional
 
+    // ---- Validation ----
     if (!txn_id || !amount || !items) {
-      return res.status(400).json({ error: "Missing fields" });
+      return res.status(400).json({
+        error: "Missing or invalid request parameters"
+      });
     }
 
-     orders[txn_id] = {
+    // ---- DUPLICATE TXN CHECK ----
+    if (orders[txn_id]) {
+      return res.status(409).json({
+        detail: `Duplicate txn_id: '${txn_id}' already exists. Please use a new, unique txn_id.`
+      });
+    }
+
+    // ---- CREATE ORDER ----
+    orders[txn_id] = {
+      tid: txn_id,
       machineId,
-      txn_id,
       amount,
       items,
-      status: "FAILED",
-      createdAt: new Date()
+      status: "pending",
+      createdAt: new Date(),
+      webhookUrl
     };
 
-    console.log(`Order ${txn_id} created for machine ${machineId}`,orders[txn_id]);
+    // ---- SEND MQTT VEND COMMAND ----
+    sendMessage(
+      `HB/${machineId}`,
+      `*VEND,${txn_id},PAYTM,${amount},${txn_id}#`
+    );
 
-    sendMessage(`HB/${machineId}`, payload = `*VEND,${txn_id},PAYTM,${amount},${txn_id}#`);
+    // ==========================
+    // 🔹 ASYNC (WEBHOOK) FLOW
+    // ==========================
+    if (webhookUrl) {
+      return res.status(202).json({
+        status: "pending",
+        tid: txn_id,
+        machine_id: machineId,
+        estimated_completion_in_seconds: 20
+      });
+    }
 
+    // ==========================
+    // 🔹 SYNC FLOW
+    // ==========================
     setTimeout(() => {
-            console.log('Simulating order success for', txn_id,orders[txn_id].status);
-           
-            res.json({
-            message: "Order created",
-            txn_id,
-            machineId,
-            status: orders[txn_id].status,
-            deviceStatus: deviceStatus[machineId] || 'NOT_FOUND'
-            });
-        },4000);
+      // simulate spiral results
+      const spiralStatuses = items.map((item) => ({
+        x: item.x,
+        y: item.y,
+        status: Math.random() > 0.3 ? 1 : 0
+      }));
+
+      orders[txn_id].status = "completed";
+      orders[txn_id].spiral_statuses = spiralStatuses;
+
+      return res.status(200).json({
+        tid: txn_id,
+        machine_id: machineId,
+        status: "completed",
+        spiral_statuses: spiralStatuses
+      });
+    }, 4000);
   }
 );
 
