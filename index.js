@@ -54,7 +54,8 @@ app.post(
             message: "Order created",
             txn_id,
             machineId,
-            status: orders[txn_id].status
+            status: orders[txn_id].status,
+            deviceStatus: deviceStatus[machineId] || 'NOT_FOUND'
             });
         },4000);
   }
