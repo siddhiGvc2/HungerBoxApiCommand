@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express();
 const { connectMQTT, sendMessage } = require("./mqtt");
-const orders = require('./orderStore'); // or same file export
+const {orders,deviceStatus} = require('./orderStore'); // or same file export
 const cors = require('cors');
 require('./mqttListener');
 
@@ -79,6 +79,43 @@ app.get(
     res.json(transaction);
   }
 );
+
+// ---- GET TRANSACTION STATUS ----
+app.get(
+  "/api/v1/deviceStatus/:txnId",
+  apiKeyAuth,
+  (req, res) => {
+     const { txnId } = req.params;
+      if (!lastHeartBeatTime) {
+      return res.json({
+        txn_id: txnId,
+        status: "NOT_FOUND"
+      });
+    }
+    const lastHeartBeatTime= deviceStatus[txnId];
+    if(lastHeartBeatTime < new Date(Date.now() - 5 * 60 * 1000).toISOString()){
+      return res.json({
+        txn_id: txnId,
+        status: "OFFLINE"
+      });
+    }
+    else{
+      return res.json({
+        txn_id: txnId,
+        status: "ONLINE"
+      });
+    }
+     
+
+   
+
+   
+    
+  }
+    
+  
+);
+
 
 // ---- START SERVER ----
 const PORT = 9090;
